@@ -5,7 +5,6 @@ from pyzbar.pyzbar import decode
 from datetime import datetime
 import json
 
-# === Setup Database ===
 def setup_database():
     conn = sqlite3.connect('inventory.db')
     c = conn.cursor()
@@ -21,10 +20,9 @@ def setup_database():
                     quantity INTEGER,
                     time_out TEXT
                 )''')
-    conn.commit() 
+    conn.commit()
     conn.close()
 
-# === Add to inventory_in ===
 def add_item(data):
     conn = sqlite3.connect('inventory.db')
     c = conn.cursor()
@@ -37,7 +35,6 @@ def add_item(data):
         print("Package already exists.")
     conn.close()
 
-# === Remove from inventory_in → Add to inventory_out ===
 def remove_item(package_id):
     conn = sqlite3.connect('inventory.db')
     c = conn.cursor()
@@ -52,45 +49,43 @@ def remove_item(package_id):
         print("Package not found.")
     conn.close()
 
-# === Scan QR Code ===
 def scan_qr():
-    cap = cv2.VideoCapture(0) #DEV/TTY/USB0
+    cap = cv2.VideoCapture(0)
     package_data = None
-    while True:
-        success, frame = cap.read()
-        if not success:
-            break
-        for barcode in decode(frame):
-            data = barcode.data.decode('utf-8')
-            try:
-                package_data = json.loads(data)
-                cv2.rectangle(frame, (barcode.rect.left, barcode.rect.top),
-                              (barcode.rect.left + barcode.rect.width, barcode.rect.top + barcode.rect.height),
-                              (0, 255, 0), 2)
-                cv2.imshow('Scan QR Code', frame)
-                cv2.waitKey(1000)  # Show green box for 1 sec
-                cap.release()
-                cv2.destroyAllWindows()
-                return package_data
-            except json.JSONDecodeError:
-                print("Invalid QR Code content")
-        cv2.imshow('Scan QR Code', frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-    cap.release()
-    cv2.destroyAllWindows()
+    try:
+        while True:
+            success, frame = cap.read()
+            if not success:
+                break
+            for barcode in decode(frame):
+                data = barcode.data.decode('utf-8')
+                try:
+                    package_data = json.loads(data)
+                    package_data['package_id'] = package_data['package_id'].strip().upper()
+                    cv2.rectangle(frame, (barcode.rect.left, barcode.rect.top),
+                                  (barcode.rect.left + barcode.rect.width, barcode.rect.top + barcode.rect.height),
+                                  (0, 255, 0), 2)
+                    cv2.imshow('Scan QR Code', frame)
+                    cv2.waitKey(1000)
+                    return package_data
+                except json.JSONDecodeError:
+                    print("Invalid QR Code content")
+            cv2.imshow('Scan QR Code', frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+    finally:
+        cap.release()
+        cv2.destroyAllWindows()
     return None
 
-# === Handle IN button ===
 def handle_in():
     data = scan_qr()
     if data:
         add_item(data)
-        result_label.configure(text=f"{data['package_id']} added to inventory.")
+        result_label.configure(text=f"✅ {data['package_id']} added to inventory.")
     else:
         result_label.configure(text="❌ No valid QR code scanned.")
 
-# === Handle OUT button ===
 def handle_out():
     data = scan_qr()
     if data:
@@ -99,7 +94,6 @@ def handle_out():
     else:
         result_label.configure(text="❌ No valid QR code scanned.")
 
-# === GUI Setup ===
 setup_database()
 ctk.set_appearance_mode("Light")
 ctk.set_default_color_theme("blue")
@@ -117,7 +111,7 @@ in_btn.pack(pady=10)
 out_btn = ctk.CTkButton(app, text="Scan OUT", command=handle_out)
 out_btn.pack(pady=10)
 
-#result_label = ctk.CTkLabel(app, text="", font=ctk.CTkFont(size=16))
-#result_label.pack(pady=20)
+result_label = ctk.CTkLabel(app, text="", font=ctk.CTkFont(size=16))
+result_label.pack(pady=20)
 
 app.mainloop()
